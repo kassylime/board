@@ -1,0 +1,80 @@
+패스워드 암호화
+Spring Framework는 비밀번호 암호화 하는 기능을 제공한다.
+비밀번호는 DB가 크래킹으로 당해도 노출되지 않도록 보호가 필요하다.
+Spring은 단방향의 암호화 기법을 제공
+
+패스워드 암호화 준비물(라이브러리)
+- spring-security-core
+
+<dependency>
+  <groupId>org.springframework.security</groupId>
+  <artifactId>spring-security-core</artifactId>
+</dependency>
+
+
+DB 관련 로그 찍기(Log4jdbc)
+일반적인 로그는 DB관련 처리에 대한 내용을 출력할 수 없음(Mybatis 내부에서 처리되기 때문)
+Log4jdbc는 DB 관련 처리 중간에서 동작하여 해당 로그를 찍을 수 있도록 도와준다.
+
+라이브러리 pom.xml에 추가
+- log4jdbc-log4j2(mvnrepository.com)
+
+<dependency>
+    <groupId>org.bgee.log4jdbc-log4j2</groupId>
+    <artifactId>log4jdbc-log4j2-jdbc4.1</artifactId>
+    <version>1.16</version>
+</dependency>
+
+
+application.properties 설정
+...driver-class-name=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+...url=jdbc:log4jdbc:mysql://127.0.0.1:3306/board_db?serverTimezone=Asia/Seoul
+
+resource폴더에 다음 파일을 추가
+1) log4jdbc.log4j2.properties : log4jdbc관련 설정
+2) logback.xml : 로그 출력 관련 설정
+
+logback.xml의 로그 설정
+패키지 로그 : 지정된 패키지 하위 클래스에서 출력하는 로그 설정
+connection 로그 : DB 접속과 관련된 로그 설정
+sqlonly 로그 : 실행한 SQL 문장만 출력하도록 설정, 개발자가 볼 설정
+sqltiming 로그 : SQL문장과 실행된 시간을 출력하도록 설정, DB를 튜닝할 때 실행시간을 살펴본다.
+audit 로그 : ResultSet을 제외한 JDBC 호출 정보를 출력하도록 설정
+resultSet 로그 : ResultSet을 포함한 JDBC 호출 정보를 출력하도록 설정
+resultsettable 로그 : SQL 조회 결과를 테이블 형식으로 출력하도록 설정. resultset과 같이 사용해야 한다.
+root 로그 : spring boot와 관련된 로그
+
+log level(로그 단계) 개념상 로그 단계
+총 7단계로 구성 - 실제적으로는 5단계만 사용
+1. off : 로그를 찍지 않는다.
+2. debug : 디버깅 시 확인이 필요한 경우(개발하는 시점)// 윗 단계를 다 출력함
+3. info : 정보로서 확인이 필요한 경우// debug는 출력되지 않음.
+4. warn : 경고(warning)로 출력이 필요한 경우 // 내가 정의하는 시스템적 상황확인, 아랫단계는 출력되지 않음.
+5. error : 에러로 처리해야 하는 경우 // 여기 까지만 사용
+6. fatal : 심각한 에러
+7. all : 항상 모든 로그를 찍는다.
+
+// 나중에는 로그를 텍스트에 찍는데 접속자가 많아지면 로그 파일의 용량이 커진다.
+선택적으로 로그를 결정해서 작성해야 한다.
+로그는 작성해놓고, 출력할지 말지를 logback.xml의 로그 설정에서 결정한다.
+
+Lombok의 로그
+1) @Log : 간편하게 사용하는 로그. 주로 메소드 info("message")/warn 두가지만 가능
+          info 레벨의 메시지를 출력, 나머지 단계의 메시지 출력은 어려움
+2) @Slf4j : 5단계로 구분하여 로그를 출력할 때 사용.
+           debug, info, warn, error, trace 메소드 제공
+   trace : 추적레벨, debug보다 상세한 정보를 나타내는 단계, 가장 낮은 단계(많이 사용되지는 않음)
+
+개발단계에서는 log를 debug로 작성
+- @Slf4j 사용 시 : log.debug("출력할 문장");
+- logback.xml의 level을 debug로 작성
+실 서버 운영시 logback.xml의 level을 info, warn 또는 error로 상향 설정하면 debug로그는 출력되지 않는다.
+
+로그인 처리
+암회화된 비밀번호를 DB로 부터 검색하여 사용자가 입력한 비밀번호화 비교하는 작업
+사용자가 입력한 비밀번호 -> 평문(plain text)
+DB에 저장된 비밀번호 -> 암호문(cipher text)
+두 문자열은 단순 equals 비교가 불가.
+Spring Security 패스워드 인코더에서 mache 메소드를 사용
+이후, 로그인 상황유지를 위해 성공정보를 세션(session)에 저장.
+저장된 로그인 성공 정보는 로그아웃 시점에 제거
